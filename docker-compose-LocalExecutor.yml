@@ -1,0 +1,71 @@
+services:
+    postgres:
+        image: postgres:9.6
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        networks:
+            - airflow-kafka
+
+    webserver:
+        build:
+            context: .
+            dockerfile: Dockerfile.airflow
+        image: kafka-spark-airflow:1.10.9
+        restart: always
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        volumes:
+            - ./stream_to_kafka.py:/usr/local/airflow/dags/stream_to_kafka.py:ro
+            - ./stream_to_kafka_dag.py:/usr/local/airflow/dags/stream_to_kafka_dag.py:ro
+            - ./activity_generator.py:/usr/local/airflow/dags/activity_generator.py:ro
+            - ./activity_generator_dag.py:/usr/local/airflow/dags/activity_generator_dag.py:ro
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+        networks:
+            - airflow-kafka
+
+    scheduler:
+        image: kafka-spark-airflow:1.10.9
+        restart: always
+        depends_on:
+            - webserver
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+        logging:
+            options:
+                max-size: 10m
+                max-file: "3"
+        volumes:
+            - ./stream_to_kafka.py:/usr/local/airflow/dags/stream_to_kafka.py:ro
+            - ./stream_to_kafka_dag.py:/usr/local/airflow/dags/stream_to_kafka_dag.py:ro
+            - ./activity_generator.py:/usr/local/airflow/dags/activity_generator.py:ro
+            - ./activity_generator_dag.py:/usr/local/airflow/dags/activity_generator_dag.py:ro
+        command: scheduler
+        networks:
+            - airflow-kafka
+
+networks:
+  airflow-kafka:
+    external: true

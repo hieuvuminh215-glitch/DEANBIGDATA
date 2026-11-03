@@ -1,0 +1,10 @@
+/spark/.ivy2/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.log
+**/checkpoints/
+spark/.ivy2/
+~$*
